@@ -1,0 +1,30 @@
+# Node
+node_modules/
+npm-debug.log
+
+# Env files (CRÍTICO)
+.env
+.env.*
+
+# Playwright
+playwright-report/
+test-results/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+
+# Java
+target/
