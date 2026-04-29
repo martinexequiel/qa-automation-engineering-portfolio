@@ -1,14 +1,30 @@
 {
-  "name": "e2e-playwright",
+  "name": "qa-automation-playwright",
   "version": "1.0.0",
-  "description": "",
+  "description": "Professional QA Automation Framework using Playwright and TypeScript",
   "main": "index.js",
-  "scripts": {},
-  "keywords": [],
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "keywords": [
+    "playwright",
+    "e2e",
+    "qa-automation",
+    "typescript"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@types/node": "^25.6.0"
+    "@types/node": "^25.6.0",
+    "playwright": "^1.59.1",
+    "typescript": "^5.3.0"
   }
 }
