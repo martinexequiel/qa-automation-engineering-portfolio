@@ -1,11 +1,21 @@
 # QA Automation Engineering Portfolio
 
-This repository showcases automation testing projects using modern tools:
+This repository demonstrates a multi-layer QA automation strategy including:
 
-- Playwright (TypeScript)
-- API Testing (Postman, Newman)
-- Performance Testing (K6)
-- Mobile Testing (Appium)
-- CI/CD pipelines
+- E2E testing with Playwright (TypeScript)
+- API testing (Postman + Newman) [in progress]
+- Performance testing (k6) [planned]
+- Mobile testing (Appium) [planned]
 
-Work in progress – continuously evolving.
+## Current focus
+E2E automation using Playwright with real user flows on SauceDemo.
+
+## What is implemented
+- Page Object Model (POM)
+- Reusable test architecture
+- Critical user journeys (login, checkout)
+- Parallel execution and test isolation
+
+## Next steps
+- API automation
+- CI/CD integration
