@@ -1,225 +1,176 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 /**
- * LoginPage - Page Object Model for Sauce Demo Login
+ * LoginPage - Enhanced Page Object Model for Sauce Demo Login
  * 
- * Encapsulates all login-related interactions and selectors.
- * Single Responsibility: Handles ONLY login functionality.
+ * DESIGN PRINCIPLES:
+ * - Single Responsibility: Only login-related functionality
+ * - Separation of Concerns: Actions (login, fill) vs Assertions (assertLoginSuccess, assertError)
+ * - Encapsulation: Private locator methods, no selector exposure to tests
+ * - Resilience: Prefers getByRole, data-test attributes as fallback
  * 
- * Characteristics:
- * - Robust selectors using data-test attributes (QA-optimized)
- * - No internal logic exposed to tests
- * - Reusable methods for common login scenarios
- * - Defensive programming with wait strategies
+ * ARCHITECTURE:
+ * 1. Private Methods: Locator helpers (getUsernameField, getPasswordField, etc.)
+ * 2. Action Methods: User interactions (goto, login, fillCredentials)
+ * 3. Assertion Methods: State verification (assertLoginSuccess, assertErrorShown, etc.)
+ * 
+ * This separation ensures tests are clean and assertions are explicit.
  */
 export class LoginPage extends BasePage {
-  /**
-   * Private selectors - Encapsulated within the class
-   * Using data-test attributes for maximum stability
-   * These selectors are implementation details, not part of the public API
-   */
-  private readonly selectors = {
-    // Primary selectors (data-test attributes - QA-optimized)
-    usernameField: '[data-test="username"]',
-    passwordField: '[data-test="password"]',
-    loginButton: '[data-test="login-button"]',
-    errorMessage: '[data-test="error"]',
-    
-    // Fallback selectors (if data-test is removed)
-    usernameFallback: '#user-name',
-    passwordFallback: '#password',
-    loginButtonFallback: '#login-button',
+  private readonly baseUrl = 'https://www.saucedemo.com';
+  private readonly timeouts = {
+    short: 2000,
+    medium: 5000,
   };
 
-  /**
-   * Base URL for the login page
-   * Externalized for flexibility across environments
-   */
-  private readonly baseUrl = 'https://www.saucedemo.com';
-
-  /**
-   * Constructor
-   * @param page - Playwright Page instance provided by Playwright Test context
-   */
   constructor(page: Page) {
     super(page);
   }
 
+  // ============================================
+  // PRIVATE LOCATOR METHODS - Implementation Details
+  // ============================================
   /**
-   * Navigate to the login page
-   * 
-   * Responsibility: Handle page navigation setup
-   * 
-   * @returns Promise<void>
-   * @example
-   * await loginPage.goto();
+   * Access username input field.
+   * Prefers getByRole for accessibility, falls back to data-test.
+   */
+  private getUsernameField() {
+    return this.page.getByRole('textbox', { name: /username/i }).or(
+      this.page.locator('[data-test="username"]')
+    );
+  }
+
+  /**
+   * Access password input field.
+   * Prefers getByRole for accessibility, falls back to data-test.
+   */
+  private getPasswordField() {
+    return this.page.getByRole('textbox', { name: /password/i }).or(
+      this.page.locator('[data-test="password"]')
+    );
+  }
+
+  /**
+   * Access login button.
+   * Prefers getByRole for accessibility, falls back to data-test.
+   */
+  private getLoginButton() {
+    return this.page.getByRole('button', { name: /login/i }).or(
+      this.page.locator('[data-test="login-button"]')
+    );
+  }
+
+  /**
+   * Access error message container.
+   * Used for assertion and visibility checks.
+   */
+  private getErrorMessage() {
+    return this.page.locator('[data-test="error"]');
+  }
+
+  // ============================================
+  // ACTION METHODS - User Interactions
+  // ============================================
+  /**
+   * Navigate to the login page and wait for page load.
+   * No assertions - just navigation.
    */
   async goto(): Promise<void> {
-    // Navigate to the base URL
     await this.page.goto(this.baseUrl);
-
-    // Wait for the username field to be visible and ready
-    // Ensures the page is fully loaded before proceeding
-    await this.page.locator(this.selectors.usernameField).waitFor({
+    
+    // Wait for the page to be interactive
+    await this.getUsernameField().waitFor({
       state: 'visible',
-      timeout: 5000,
+      timeout: this.timeouts.medium,
     });
   }
 
   /**
-   * Perform login action with username and password
-   * 
-   * Responsibility: Execute the complete login flow
-   * - Fill username and password
-   * - Click login button
-   * - Wait for navigation/response
-   * 
-   * Internal Logic:
-   * - Handles fill operations sequentially
-   * - Validates input fields are interactive before filling
-   * - Waits for login action to complete
-   * 
-   * @param username - User account username
-   * @param password - User account password
-   * @returns Promise<void>
-   * @example
-   * await loginPage.login('standard_user', 'secret_sauce');
+   * Fill login credentials and submit form.
+   * Does NOT assert on success/failure - caller is responsible for assertions.
    */
   async login(username: string, password: string): Promise<void> {
-    // Fill username field
-    // Using locator with fallback for resilience
-    const usernameLocator = this.page.locator(
-      `${this.selectors.usernameField}, ${this.selectors.usernameFallback}`
-    );
-    await usernameLocator.fill(username);
-
-    // Fill password field
-    // Using locator with fallback for resilience
-    const passwordLocator = this.page.locator(
-      `${this.selectors.passwordField}, ${this.selectors.passwordFallback}`
-    );
-    await passwordLocator.fill(password);
-
-    // Click login button
-    // Using locator with fallback for resilience
-    const loginButtonLocator = this.page.locator(
-      `${this.selectors.loginButton}, ${this.selectors.loginButtonFallback}`
-    );
-    await loginButtonLocator.click();
-
-    // Wait for the login action to complete
-    // Either the page navigates away or error message appears
+    await this.fillCredentials(username, password);
+    await this.clickLoginButton();
+    
+    // Wait for navigation or error to appear
     await Promise.race([
-      // Success: Page navigates away from login URL
-      this.page.waitForURL('**/inventory.html', { timeout: 5000 }),
-
-      // Failure: Error message appears on the page
-      this.page
-        .locator(this.selectors.errorMessage)
-        .waitFor({ state: 'visible', timeout: 5000 }),
+      this.page.waitForURL('**/inventory.html', { timeout: this.timeouts.medium }),
+      this.getErrorMessage().waitFor({ state: 'visible', timeout: this.timeouts.medium }),
     ]).catch(() => {
-      // If neither happens, continue anyway
-      // Test will catch the assertion failure later
+      // Ignored: test will verify state
     });
   }
 
   /**
-   * Get error message text from the login form
-   * 
-   * Responsibility: Extract error message without exposing selectors
-   * 
-   * Internal Logic:
-   * - Waits for error message to appear
-   * - Extracts and returns text
-   * - Handles cases where no error message exists
-   * 
-   * @returns Promise<string> - The error message text, or empty string if none
-   * @example
-   * const errorText = await loginPage.getError();
-   * expect(errorText).toContain('Username and password do not match');
+   * Fill username and password fields.
+   * Extracted as a private helper for reusability.
    */
-  async getError(): Promise<string> {
+  private async fillCredentials(username: string, password: string): Promise<void> {
+    await this.getUsernameField().fill(username);
+    await this.getPasswordField().fill(password);
+  }
+
+  /**
+   * Click the login button.
+   * Extracted as a private helper for clarity.
+   */
+  private async clickLoginButton(): Promise<void> {
+    await this.getLoginButton().click();
+  }
+
+  // ============================================
+  // ASSERTION METHODS - State Verification
+  // ============================================
+  /**
+   * Assert that login was successful.
+   * Verifies: URL, page title, no error message.
+   */
+  async assertLoginSuccess(): Promise<void> {
+    await expect(this.page).toHaveURL(/inventory\.html/);
+    await expect(this.page).toHaveTitle('Swag Labs');
+    await this.assertNoErrorMessage();
+  }
+
+  /**
+   * Assert that error message is displayed and contains expected text.
+   */
+  async assertErrorMessage(expectedText: string): Promise<void> {
+    const errorLocator = this.getErrorMessage();
+    await expect(errorLocator).toBeVisible();
+    await expect(errorLocator).toContainText(expectedText);
+  }
+
+  /**
+   * Assert that NO error message is visible.
+   */
+  async assertNoErrorMessage(): Promise<void> {
+    const errorLocator = this.getErrorMessage();
+    const count = await errorLocator.count();
+    expect(count).toBe(0);
+  }
+
+  /**
+   * Assert that the login form is displayed and ready.
+   */
+  async assertLoginFormVisible(): Promise<void> {
+    await expect(this.getUsernameField()).toBeVisible();
+    await expect(this.getPasswordField()).toBeVisible();
+    await expect(this.getLoginButton()).toBeVisible();
+  }
+
+  /**
+   * Get error message text (for debugging/flexible assertions).
+   * Deprecated: Use assertErrorMessage() instead for consistent testing.
+   */
+  async getErrorText(): Promise<string> {
     try {
-      // Wait for error message to be visible
-      const errorLocator = this.page.locator(this.selectors.errorMessage);
-
-      // Ensure the element is visible before extracting text
-      await errorLocator.waitFor({ state: 'visible', timeout: 2000 });
-
-      // Extract and return the error message text
-      // Use innerText for visible text only
-      const errorText = await errorLocator.innerText();
-
-      return errorText || '';
+      const errorLocator = this.getErrorMessage();
+      await errorLocator.waitFor({ state: 'visible', timeout: this.timeouts.short });
+      return await errorLocator.innerText();
     } catch {
-      // If no error message found, return empty string
-      // This allows tests to handle missing errors gracefully
       return '';
-    }
-  }
-
-  /**
-   * Check if the login page is loaded
-   * 
-   * Utility method for test validation
-   * Useful for verifying redirect from dashboard back to login
-   * 
-   * @returns Promise<boolean> - True if login page is visible
-   * @example
-   * expect(await loginPage.isLoginPageVisible()).toBe(true);
-   */
-  async isLoginPageVisible(): Promise<boolean> {
-    try {
-      // Check if the username field is visible
-      const usernameLocator = this.page.locator(
-        `${this.selectors.usernameField}, ${this.selectors.usernameFallback}`
-      );
-
-      await usernameLocator.waitFor({ state: 'visible', timeout: 2000 });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Check that the login error message is not visible
-   * 
-   * Useful for validating default page state and post-login cleanup.
-   * 
-   * @returns Promise<boolean> - True if the error message is hidden or absent
-   * @example
-   * expect(await loginPage.isErrorNotVisible()).toBe(true);
-   */
-  async isErrorNotVisible(): Promise<boolean> {
-    try {
-      const errorLocator = this.page.locator(this.selectors.errorMessage);
-      await errorLocator.waitFor({ state: 'hidden', timeout: 2000 });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Check if user is already authenticated (on inventory page)
-   * 
-   * Useful for tests that may start with authenticated storage state
-   * 
-   * @returns Promise<boolean> - True if on inventory page
-   * @example
-   * if (!(await loginPage.isAuthenticated())) {
-   *   await loginPage.login(username, password);
-   * }
-   */
-  async isAuthenticated(): Promise<boolean> {
-    try {
-      // Check if current URL contains inventory
-      const currentUrl = this.page.url();
-      return currentUrl.includes('/inventory.html');
-    } catch {
-      return false;
     }
   }
 }

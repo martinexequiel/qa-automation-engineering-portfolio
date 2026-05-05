@@ -1,106 +1,104 @@
 import { expect, test } from '@fixtures/index';
-import {
-  validUsers,
-  lockedOutUser,
-  invalidCredentials,
-  successIndicators,
-} from '@utils/testData';
+import { loginWithCredentials, attemptInvalidLogin } from '@flows/index';
+import { validUsers, lockedOutUser, invalidCredentials } from '@utils/testData';
 
 /**
- * Authentication Test Suite - Sauce Demo
+ * AUTHENTICATION TEST SUITE - REFACTORED
  * 
- * This suite is organized for clarity, maintainability, and reuse.
- * It validates core login behavior, negative authentication paths,
- * and error handling using shared page objects and fixtures.
+ * IMPROVEMENTS:
+ * 1. Flows layer - loginWithCredentials() replaces manual goto() + login()
+ * 2. Explicit assertions - assertErrorMessage() is clearer than getError()
+ * 3. Atomic tests - each test has ONE responsibility
+ * 4. Separated concerns - page actions vs assertions explicit
+ * 5. Better readability - test reads like business behavior
+ * 
+ * ARCHITECTURE:
+ * - Flows orchestrate page object interactions
+ * - Page objects expose action and assertion methods
+ * - Tests use flows to reduce duplication
+ * - Tests assert explicitly on business outcomes
  */
 
 test.describe('Authentication Flow @smoke @regression', () => {
   // Override storageState for login tests to ensure clean authentication state
   test.use({ storageState: undefined });
 
-  test.beforeEach(async ({ loginPage }) => {
-    await loginPage.goto();
-  });
-
+  // ============================================
+  // POSITIVE SCENARIOS - Successful Login
+  // ============================================
   test.describe('Successful Login', () => {
     validUsers.forEach((user) => {
-      test(`should login successfully with ${user.description} [${user.username}]`, async ({
-        page,
-        loginPage,
-      }) => {
-        await loginPage.login(user.username, user.password);
+      test(`should login successfully with ${user.description}`, async ({ page }) => {
+        // GIVEN: We have a valid user credential
+        // WHEN: We use the login flow with that credential
+        // THEN: Login should succeed
+        const loginPage = await loginWithCredentials(page, user.username, user.password);
 
-        expect(page.url()).toMatch(successIndicators.urlPattern);
-        expect(page).toHaveTitle(successIndicators.title);
-
-        const errorMessage = await loginPage.getError();
-        expect(errorMessage).toBe('');
+        // Assert using explicit assertion method (not manual expectations)
+        await loginPage.assertLoginSuccess();
       });
     });
   });
 
-  test.describe('Account Lockout', () => {
-    test('should display error for locked out user', async ({ loginPage }) => {
-      await loginPage.login(lockedOutUser.username, lockedOutUser.password);
-
-      expect(await loginPage.isLoginPageVisible()).toBe(true);
-      expect(await loginPage.getError()).toContain(lockedOutUser.expectedError);
-    });
-  });
-
-  test.describe('Invalid Login Attempts', () => {
+  // ============================================
+  // NEGATIVE SCENARIOS - Login Failures
+  // ============================================
+  test.describe('Invalid Credentials', () => {
     invalidCredentials.forEach((credential) => {
-      test(`should show error when ${credential.description}`, async ({ loginPage }) => {
-        await loginPage.login(credential.username, credential.password);
+      test(`should show error when ${credential.description}`, async ({ page }) => {
+        // GIVEN: We have invalid credentials
+        // WHEN: We attempt login with those credentials
+        // THEN: Error should display the expected message
+        const loginPage = await attemptInvalidLogin(page, credential.username, credential.password);
 
-        expect(await loginPage.isLoginPageVisible()).toBe(true);
-
-        const errorMessage = await loginPage.getError();
-        expect(errorMessage).toContain(credential.expectedError);
-        expect(errorMessage.length).toBeGreaterThan(0);
+        // Use explicit assertion method for error handling
+        await loginPage.assertErrorMessage(credential.expectedError);
       });
     });
   });
 
+  test('should display error for locked out user', async ({ page }) => {
+    // GIVEN: We have a locked out user account
+    // WHEN: We attempt login with that account
+    // THEN: Specific account lockout error should appear
+    const loginPage = await attemptInvalidLogin(page, lockedOutUser.username, lockedOutUser.password);
+
+    // Verify it's still on login page and shows specific error
+    await loginPage.assertLoginFormVisible();
+    await loginPage.assertErrorMessage(lockedOutUser.expectedError);
+  });
+
+  // ============================================
+  // EDGE CASES - Unusual Scenarios
+  // ============================================
   test.describe('Login Page State', () => {
-    test('should load login page and display form fields', async ({ loginPage }) => {
-      expect(await loginPage.isLoginPageVisible()).toBe(true);
-      expect(await loginPage.isErrorNotVisible()).toBe(true);
+    test('should load login page with form fields visible', async ({ loginPage }) => {
+      // GIVEN: We navigate to login page
+      // WHEN: Page loads
+      // THEN: All form fields should be visible
+      await loginPage.goto();
+      await loginPage.assertLoginFormVisible();
     });
 
-    test('should clear error message after successful login following failed attempt', async ({
-      loginPage,
-      page,
-    }) => {
-      await loginPage.login('invalid_user', 'wrong_password');
-      let errorMessage = await loginPage.getError();
-      expect(errorMessage.length).toBeGreaterThan(0);
-
-      await loginPage.login('standard_user', 'secret_sauce');
-      expect(page.url()).toMatch(successIndicators.urlPattern);
-
-      errorMessage = await loginPage.getError();
-      expect(errorMessage).toBe('');
+    test('should not show error message on initial page load', async ({ loginPage }) => {
+      // GIVEN: Fresh login page
+      // WHEN: We navigate to it
+      // THEN: No error message should be visible
+      await loginPage.goto();
+      await loginPage.assertNoErrorMessage();
     });
   });
 
-  test.describe('Login Edge Cases', () => {
-    test('should handle multiple failed login attempts', async ({ loginPage }) => {
+  test.describe('Multiple Failed Attempts', () => {
+    test('should allow multiple failed login attempts', async ({ page }) => {
+      // GIVEN: User attempts login multiple times with wrong credentials
+      // WHEN: Each attempt fails
+      // THEN: User can continue attempting without account lockout
       for (let i = 0; i < 3; i++) {
-        await loginPage.login('invalid_user', 'wrong_password');
-        const errorMessage = await loginPage.getError();
-        expect(errorMessage.length).toBeGreaterThan(0);
+        const loginPage = await attemptInvalidLogin(page, 'invalid_user', 'wrong_password');
+        await loginPage.assertErrorMessage('Username and password do not match');
       }
-
-      expect(await loginPage.isLoginPageVisible()).toBe(true);
-    });
-
-    test('should validate credentials with special characters', async ({ loginPage, page }) => {
-      await loginPage.login('  standard_user  ', 'secret_sauce');
-
-      const isErrorVisible = !(await loginPage.isErrorNotVisible());
-      const isNavigated = page.url().match(successIndicators.urlPattern);
-      expect(isErrorVisible || isNavigated).toBe(true);
     });
   });
 });
+

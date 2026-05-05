@@ -17,9 +17,10 @@
     "paths": {
       "@pages/*": ["pages/*"],
       "@fixtures/*": ["fixtures/*"],
-      "@utils/*": ["utils/*"]
+      "@utils/*": ["utils/*"],
+      "@flows/*": ["flows/*"]
     }
   },
-  "include": ["tests", "pages", "fixtures", "utils"],
+  "include": ["tests", "pages", "fixtures", "utils", "flows"],
   "exclude": ["node_modules", "dist"]
 }

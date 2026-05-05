@@ -1,57 +1,106 @@
 import { expect, test } from '@fixtures/index';
+import { completePurchaseAsStandardUser } from '@flows/index';
 import { products } from '@utils/testData';
 
-const productName = products.backpack;
-
 /**
- * Purchase Flow E2E Test
+ * PURCHASE FLOW E2E TEST - REFACTORED
  *
- * Business objective:
- * - Validate login with a standard user
- * - Add a product to the cart
- * - Confirm the item is present in the cart
- * - Complete the checkout workflow
- * - Verify order completion
+ * IMPROVEMENTS:
+ * 1. Uses completePurchaseAsStandardUser() flow - encapsulates entire business flow
+ * 2. Explicit assertions - assertOrderComplete() instead of checking boolean
+ * 3. Atomic tests - separated positive/negative/edge cases
+ * 4. Cleaner code - less manual orchestration in test
+ * 5. More maintainable - flow changes don't break multiple tests
+ *
+ * ARCHITECTURE:
+ * - completePurchaseAsStandardUser() orchestrates entire purchase workflow
+ * - Flow returns all page objects for flexible assertions
+ * - Tests focus on verifying business outcomes
+ * - Page objects handle interaction details
  */
 
 test.describe('Purchase Flow @regression', () => {
-  test.beforeEach(async ({ loginPage }) => {
-    await loginPage.goto();
-  });
+  const customerInfo = {
+    firstName: 'John',
+    lastName: 'Doe',
+    postalCode: '12345',
+  };
 
-  test('should complete a product purchase end-to-end using shared Page Objects', async ({
-    loginPage,
-    inventoryPage,
-    cartPage,
-    checkoutPage,
-    checkoutCompletePage,
-    standardUser,
-  }) => {
-    // Login only if not already authenticated
-    if (!(await loginPage.isAuthenticated())) {
-      await loginPage.login(standardUser.username, standardUser.password);
-    }
-
-    await inventoryPage.waitForInventoryPage();
-    await inventoryPage.addProductToCart(productName);
-    expect(await inventoryPage.getCartBadgeCount()).toBeGreaterThan(0);
-
-    await inventoryPage.goToCart();
-    await cartPage.waitForCartPage();
-    expect(await cartPage.isProductInCart(productName)).toBe(true);
-
-    await cartPage.proceedToCheckout();
-    await checkoutPage.fillCustomerInformation('Test', 'Buyer', '90210');
-    await checkoutPage.continueToOverview();
-    expect(await checkoutPage.isProductVisibleInOverview(productName)).toBe(true);
-
-    await checkoutPage.finishPurchase();
-    expect(await checkoutCompletePage.isOrderComplete()).toBe(true);
-    expect(await checkoutCompletePage.getOrderConfirmationMessage()).toContain(
-      'Your order has been dispatched'
+  // ============================================
+  // POSITIVE SCENARIOS - Successful Purchase
+  // ============================================
+  test('should complete purchase with standard user for Backpack', async ({ page }) => {
+    // GIVEN: We have a standard user and Backpack product
+    // WHEN: We complete the full purchase flow
+    // THEN: Order should be confirmed successfully
+    const { checkoutCompletePage } = await completePurchaseAsStandardUser(
+      page,
+      products.backpack,
+      customerInfo
     );
 
+    // Use explicit assertion method instead of checking return values
+    await checkoutCompletePage.assertOrderComplete();
+    await checkoutCompletePage.assertSuccessMessage('Your order has been dispatched');
+  });
+
+  test('should complete purchase with standard user for Bolt T-Shirt', async ({ page }) => {
+    // GIVEN: Different product (Bolt T-Shirt)
+    // WHEN: We complete the purchase flow
+    // THEN: Order should succeed regardless of product
+    const { checkoutCompletePage, inventoryPage } = await completePurchaseAsStandardUser(
+      page,
+      products.boltTShirt,
+      customerInfo
+    );
+
+    // Verify order completion
+    await checkoutCompletePage.assertOrderComplete();
+
+    // Navigate back and verify inventory page
     await checkoutCompletePage.returnToInventory();
     await inventoryPage.waitForInventoryPage();
+  });
+
+  // ============================================
+  // EDGE CASES - Different Customer Info
+  // ============================================
+  test('should handle special characters in customer information', async ({ page }) => {
+    // GIVEN: Customer info with special characters
+    const specialCharInfo = {
+      firstName: "O'Brien",
+      lastName: "García-López",
+      postalCode: '12345-6789',
+    };
+
+    // WHEN: We complete purchase with this info
+    // THEN: Purchase should succeed despite special characters
+    const { checkoutCompletePage } = await completePurchaseAsStandardUser(
+      page,
+      products.backpack,
+      specialCharInfo
+    );
+
+    // Verify order was processed
+    await checkoutCompletePage.assertOrderComplete();
+  });
+
+  test('should complete purchase with minimal customer information', async ({ page }) => {
+    // GIVEN: Minimal required customer info
+    const minimalInfo = {
+      firstName: 'A',
+      lastName: 'B',
+      postalCode: '1',
+    };
+
+    // WHEN: We complete purchase with minimal info
+    // THEN: Purchase should still succeed
+    const { checkoutCompletePage } = await completePurchaseAsStandardUser(
+      page,
+      products.bikeLight,
+      minimalInfo
+    );
+
+    await checkoutCompletePage.assertOrderComplete();
   });
 });
