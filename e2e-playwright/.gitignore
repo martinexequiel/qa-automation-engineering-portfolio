@@ -7,3 +7,7 @@ node_modules/
 /playwright/.cache/
 /playwright/.auth/
 /.playwright-mcp/
+# Playwright generated artifacts
+playwright-report/
+test-results/
+test-results-root/

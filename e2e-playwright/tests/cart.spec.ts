@@ -61,7 +61,7 @@ test.describe('Shopping Cart @regression', () => {
       // GIVEN: Logged-in user
       // WHEN: User navigates to empty cart (no products added)
       // THEN: Cart should be empty
-      await page.goto('https://www.saucedemo.com/cart.html');
+      await page.goto('/cart.html');
       // Wait for cart page to load (URL check is sufficient for empty cart)
       await page.waitForURL('**/cart.html', { timeout: 5000 });
       // Verify cart is empty (no cart items present)

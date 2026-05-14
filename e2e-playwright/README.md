@@ -78,6 +78,14 @@ e2e-playwright/
 npm install
 npx playwright install --with-deps
 npm test
+
+npm run test:chromium    # Only Chromium
+npm run test:firefox     # Only Firefox
+npm run test:webkit      # Only WebKit
+
+npx playwright test --project=chromium #Playwright command - Only Chromium
+npx playwright test tests/cart.spec.ts --project=chromium #specific test - Only Chromium
+npm test -- tests/cart.spec.ts --project=chromium #npm specific test
 ```
 
 ## Contributing
@@ -87,6 +95,16 @@ npm test
 - Prefer data-test selectors and role-based locators.
 - Avoid `test.only()` in committed code.
 - Run `npm test` before pushing.
+
+## Test Execution Evidence
+
+### Regression Suite
+
+![Regression Suite](./docs/screenshots/playwright-regression-suite.png)
+
+### Test Details
+
+![Test Details](./docs/screenshots/playwright-test-details.png)
 
 ## CI/CD
 

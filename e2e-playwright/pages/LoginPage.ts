@@ -18,7 +18,7 @@ import { BasePage } from './BasePage';
  * This separation ensures tests are clean and assertions are explicit.
  */
 export class LoginPage extends BasePage {
-  private readonly baseUrl = 'https://www.saucedemo.com';
+  private readonly baseUrl = process.env.BASE_URL || 'https://www.saucedemo.com';
   private readonly timeouts = {
     short: 2000,
     medium: 5000,
